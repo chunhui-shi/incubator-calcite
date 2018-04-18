@@ -84,10 +84,12 @@ public abstract class SqlToRelTestBase {
 
   protected static final String NL = System.getProperty("line.separator");
 
+  protected static final SqlConformance DEFAULT_CONFORMANCE = SqlConformanceEnum.DEFAULT;
   //~ Instance fields --------------------------------------------------------
 
-  protected final Tester tester = createTester();
+  protected final Tester tester = createTester(SqlConformanceEnum.DEFAULT);
 
+  protected final Tester lenienTester = createTester(SqlConformanceEnum.LENIENT);
   //~ Methods ----------------------------------------------------------------
 
   public SqlToRelTestBase() {
@@ -96,9 +98,13 @@ public abstract class SqlToRelTestBase {
 
   protected Tester createTester() {
     return new TesterImpl(getDiffRepos(), false, false, true, false,
-        null, null);
+        null, null, SqlToRelConverter.Config.DEFAULT, DEFAULT_CONFORMANCE);
   }
 
+  protected Tester createTester(SqlConformance conformance) {
+    return new TesterImpl(getDiffRepos(), false, false, true, false,
+        null, null, SqlToRelConverter.Config.DEFAULT, conformance);
+  }
   /**
    * Returns the default diff repository for this test, or null if there is
    * no repository.
@@ -627,7 +633,8 @@ public abstract class SqlToRelTestBase {
     }
 
     public SqlNode parseQuery(String sql) throws Exception {
-      SqlParser parser = SqlParser.create(sql);
+      SqlParser parser = SqlParser.create(sql,
+          SqlParser.configBuilder().setConformance(getConformance()).build());
       return parser.parseQuery();
     }
 
@@ -705,7 +712,9 @@ public abstract class SqlToRelTestBase {
       // that plans come out nicely stacked instead of first
       // line immediately after CDATA start
       String actual = NL + RelOptUtil.toString(rel);
-      diffRepos.assertEquals("plan", plan, actual);
+      if (plan.compareToIgnoreCase("ANYPLAN") != 0) {
+        diffRepos.assertEquals("plan", plan, actual);
+      }
     }
 
     /**

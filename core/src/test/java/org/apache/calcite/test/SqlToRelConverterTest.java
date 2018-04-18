@@ -67,7 +67,7 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
   /** Sets the SQL statement for a test. */
   public final Sql sql(String sql) {
     return new Sql(sql, true, true, tester, false,
-        SqlToRelConverter.Config.DEFAULT, SqlConformanceEnum.DEFAULT);
+        SqlToRelConverter.Config.DEFAULT, tester.getConformance());
   }
 
   protected final void check(
@@ -1053,6 +1053,30 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
   @Test public void testUnnestSubQuery() {
     final String sql = "select*from unnest(multiset(select*from dept))";
     sql(sql).ok();
+  }
+
+  @Test public void testUnnestArrayAggPlan() {
+    final String sql = "select d.deptno, e2.empno_avg\n"
+        + "from dept_nested as d outer apply\n"
+        + " (select avg(e.empno) as empno_avg from UNNEST(d.employees) as e) e2";
+
+    sql(sql).with(getLenienTester()).ok();
+  }
+
+  @Test public void testUnnestArrayPlan() {
+    final String sql = "select d.deptno, e2.empno\n"
+        + "from dept_nested as d,\n"
+        + " UNNEST(d.employees) e2";
+
+    sql(sql).with(getExtendedTester()).ok();
+  }
+
+  @Test public void testUnnestApplyDefaultConformance() {
+    final String sql = "select d.deptno, e2.empno_avg\n"
+        + "from dept_nested as d outer apply\n"
+        + " (select avg(e.empno) as empno_avg from UNNEST(d.employees) as e) e2";
+
+    sql(sql).with(getExtendedTester()).ok();
   }
 
   @Test public void testArrayOfRecord() {
@@ -2409,6 +2433,44 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
     sql(sql).with(getTesterWithDynamicTable()).ok();
   }
 
+  @Test
+  public void testDynamicNestedColumn() throws Exception {
+
+    final String sql1 = "select t2.fake_col as fake2 from SALES.CUSTOMER as t2";
+    sql(sql1).with(getTesterWithDynamicTable()).anyPlan();
+
+    final String sql2 = "select t2.fake_col['fake_col2'] as fake2 from SALES.CUSTOMER as t2";
+    sql(sql2).with(getTesterWithDynamicTable()).anyPlan();
+
+    final String sql3 = "select t3.fake_q1['fake_col2'] as fake2 "
+        + "from (select t2.fake_col as fake_q1 from SALES.CUSTOMER as t2) as t3";
+    sql(sql3).with(getTesterWithDynamicTable()).anyPlan();
+
+    final String sql4 = "select t3.fake_q1['fake_col2'] as fake2 "
+        + "from (select t2.fake_col as fake_q1 from SALES.CUSTOMER as t2) as t3";
+    sql(sql4).with(getTesterWithDynamicTable()).anyPlan();
+  }
+
+  @Test
+  public void testDynamicSchemaUnnest() throws Exception {
+
+    final String sql3 = "select t1.c_nationkey, t3.fake_col3 "
+        + "from SALES.CUSTOMER as t1, "
+        + "lateral (select t2.fake_col2 as fake_col3 from unnest(t1.fake_col) as t2) as t3";
+
+    sql(sql3).with(getTesterWithDynamicTable()).anyPlan();
+
+  }
+
+  @Test
+  public void testDynamicSchemaSubquery() throws Exception {
+
+    final String sql3 = "select t1.fake_col, t1.fake_col2 as fake_col2 "
+        + "from (select * from SALES.CUSTOMER ) as t1";
+
+    sql(sql3).with(getTesterWithDynamicTable()).anyPlan();
+
+  }
   /**
    * Test case for Dynamic Table / Dynamic Star support
    * <a href="https://issues.apache.org/jira/browse/CALCITE-1150">[CALCITE-1150]</a>
@@ -2514,6 +2576,16 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
       });
   }
 
+  private Tester getLenienTester() {
+    return lenienTester.withCatalogReaderFactory(
+        new Function<RelDataTypeFactory, Prepare.CatalogReader>() {
+          public Prepare.CatalogReader apply(RelDataTypeFactory typeFactory) {
+            return new MockCatalogReader(typeFactory, true)
+                .init().init2();
+          }
+        });
+  }
+
   private Tester getTesterWithDynamicTable() {
     return tester.withCatalogReaderFactory(
         new Function<RelDataTypeFactory, Prepare.CatalogReader>() {
@@ -2546,6 +2618,7 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
                 regionTable.addColumn("R_NAME", varcharType);
                 regionTable.addColumn("R_COMMENT", varcharType);
                 registerTable(regionTable);
+
                 return this;
               }
               // CHECKSTYLE: IGNORE 1
@@ -2781,11 +2854,13 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
     public void ok() {
       convertsTo("${plan}");
     }
-
+    public void anyPlan() {
+      convertsTo("ANYPLAN");
+    }
     public void convertsTo(String plan) {
       tester.withExpand(expand)
           .withDecorrelation(decorrelate)
-          .withConformance(conformance)
+          .withConformance(tester.getConformance())
           .withConfig(config)
           .assertConvertsTo(sql, plan, trim);
     }

@@ -5066,4 +5066,42 @@ LogicalProject(A=[$0], B=[$1])
 ]]>
         </Resource>
     </TestCase>
+    <TestCase name="testUnnestArrayAggPlan">
+        <Resource name="sql">
+            <![CDATA[select  d.deptno, e2.empno_avg
+            from dept_nested as d outer apply
+           (select avg(e.empno) as empno_avg from UNNEST(d.employees) as e) e2]]>
+        </Resource>
+        <Resource name="plan">
+            <![CDATA[
+LogicalProject(DEPTNO=[$0], EMPNO_AVG=[$3])
+  LogicalProject(DEPTNO=[$0], NAME=[$1], EMPLOYEES=[$2], EMPNO_AVG=[$3])
+    LogicalCorrelate(correlation=[$cor0], joinType=[left], requiredColumns=[{2}])
+      LogicalTableScan(table=[[CATALOG, SALES, DEPT_NESTED]])
+      LogicalAggregate(group=[{}], EMPNO_AVG=[AVG($0)])
+        LogicalProject(EMPNO=[$0])
+          Uncollect
+            LogicalProject(EMPLOYEES=[$cor0.EMPLOYEES_2])
+              LogicalValues(tuples=[[{ 0 }]])
+]]>
+        </Resource>
+    </TestCase>
+    <TestCase name="testUnnestArrayPlan">
+        <Resource name="sql">
+            <![CDATA[select  d.deptno, e2.empno_avg
+            from dept_nested as d, 
+            UNNEST(d.employees) e2]]>
+        </Resource>
+        <Resource name="plan">
+            <![CDATA[
+LogicalProject(DEPTNO=[$0], EMPNO=[$3])
+  LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{2}])
+    LogicalTableScan(table=[[CATALOG, SALES, DEPT_NESTED]])
+    Uncollect
+      LogicalProject(EMPLOYEES=[$cor0.EMPLOYEES_2])
+        LogicalValues(tuples=[[{ 0 }]])
+]]>
+        </Resource>
+    </TestCase>
+
 </Root>

@@ -23,9 +23,12 @@ import org.apache.calcite.rel.RelInput;
 import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
+import org.apache.calcite.rel.type.DynamicRecordType;
+import org.apache.calcite.rel.type.DynamicRecordTypeImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
+import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
 import org.apache.calcite.sql.SqlUnnestOperator;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.type.MapSqlType;
@@ -123,14 +126,24 @@ public class Uncollect extends SingleRel {
     RelDataType inputType = rel.getRowType();
     assert inputType.isStruct() : inputType + " is not a struct";
     final List<RelDataTypeField> fields = inputType.getFieldList();
-    final RelDataTypeFactory.Builder builder =
-        rel.getCluster().getTypeFactory().builder();
+    final RelDataTypeFactory typeFactory = rel.getCluster().getTypeFactory();
+    final RelDataTypeFactory.Builder builder = typeFactory.builder();
     for (RelDataTypeField field : fields) {
       if (field.getType() instanceof MapSqlType) {
         builder.add(SqlUnnestOperator.MAP_KEY_COLUMN_NAME, field.getType().getKeyType());
         builder.add(SqlUnnestOperator.MAP_VALUE_COLUMN_NAME, field.getType().getValueType());
       } else {
         RelDataType ret = field.getType().getComponentType();
+        if (ret == null) {
+          DynamicRecordType dynRet = new DynamicRecordTypeImpl(typeFactory);
+          RelDataTypeField dynField = new RelDataTypeFieldImpl(
+              DynamicRecordType.DYNAMIC_STAR_PREFIX,
+              fields.size(),
+              typeFactory.createTypeWithNullability(
+                  typeFactory.createSqlType(SqlTypeName.DYNAMIC_STAR), true));
+          dynRet.getFieldList().add(dynField);
+          ret = dynRet;
+        }
         assert null != ret;
         if (ret.isStruct()) {
           builder.addAll(ret.getFieldList());
