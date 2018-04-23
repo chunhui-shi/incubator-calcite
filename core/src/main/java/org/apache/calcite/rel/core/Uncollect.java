@@ -24,16 +24,17 @@ import org.apache.calcite.rel.RelNode;
 import org.apache.calcite.rel.RelWriter;
 import org.apache.calcite.rel.SingleRel;
 import org.apache.calcite.rel.type.DynamicRecordType;
-import org.apache.calcite.rel.type.DynamicRecordTypeImpl;
 import org.apache.calcite.rel.type.RelDataType;
 import org.apache.calcite.rel.type.RelDataTypeFactory;
 import org.apache.calcite.rel.type.RelDataTypeField;
 import org.apache.calcite.rel.type.RelDataTypeFieldImpl;
+import org.apache.calcite.rel.type.RelRecordType;
 import org.apache.calcite.sql.SqlUnnestOperator;
 import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.type.MapSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -135,14 +136,16 @@ public class Uncollect extends SingleRel {
       } else {
         RelDataType ret = field.getType().getComponentType();
         if (ret == null) {
-          DynamicRecordType dynRet = new DynamicRecordTypeImpl(typeFactory);
+          //DynamicRecordType dynRet = new DynamicRecordTypeImpl(typeFactory);
           RelDataTypeField dynField = new RelDataTypeFieldImpl(
               DynamicRecordType.DYNAMIC_STAR_PREFIX,
-              fields.size(),
+              0,
               typeFactory.createTypeWithNullability(
                   typeFactory.createSqlType(SqlTypeName.DYNAMIC_STAR), true));
-          dynRet.getFieldList().add(dynField);
-          ret = dynRet;
+          List<RelDataTypeField> toAddFields = new ArrayList<>();
+          toAddFields.add(dynField);
+          RelRecordType dynRet = new RelRecordType(toAddFields);
+          return dynRet;
         }
         assert null != ret;
         if (ret.isStruct()) {
