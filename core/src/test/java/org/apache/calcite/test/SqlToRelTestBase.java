@@ -712,9 +712,7 @@ public abstract class SqlToRelTestBase {
       // that plans come out nicely stacked instead of first
       // line immediately after CDATA start
       String actual = NL + RelOptUtil.toString(rel);
-      if (plan.compareToIgnoreCase("ANYPLAN") != 0) {
-        diffRepos.assertEquals("plan", plan, actual);
-      }
+      diffRepos.assertEquals("plan", plan, actual);
     }
 
     /**

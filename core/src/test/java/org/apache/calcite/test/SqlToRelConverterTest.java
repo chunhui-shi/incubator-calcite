@@ -1071,6 +1071,21 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
     sql(sql).with(getExtendedTester()).ok();
   }
 
+  @Test public void testUnnestArrayPlanStar() {
+    final String sql = "select *\n"
+        + "from dept_nested as d,\n"
+        + " UNNEST(d.employees) e2";
+
+    sql(sql).with(getExtendedTester()).ok();
+  }
+  @Test public void testUnnestArrayPlan2() {
+    final String sql = "select d.deptno, e2.empno\n"
+        + "from dept_nested as d,\n"
+        + " UNNEST(d.employees) as e2(empno, y, z)";
+
+    sql(sql).with(getExtendedTester()).ok();
+  }
+
   @Test public void testUnnestApplyDefaultConformance() {
     final String sql = "select d.deptno, e2.empno_avg\n"
         + "from dept_nested as d outer apply\n"
@@ -2436,19 +2451,10 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
   @Test
   public void testDynamicNestedColumn() throws Exception {
 
-    final String sql1 = "select t2.fake_col as fake2 from SALES.CUSTOMER as t2";
-    sql(sql1).with(getTesterWithDynamicTable()).anyPlan();
-
-    final String sql2 = "select t2.fake_col['fake_col2'] as fake2 from SALES.CUSTOMER as t2";
-    sql(sql2).with(getTesterWithDynamicTable()).anyPlan();
-
-    final String sql3 = "select t3.fake_q1['fake_col2'] as fake2 "
+    final String sql = "select t3.fake_q1['fake_col2'] as fake2 "
         + "from (select t2.fake_col as fake_q1 from SALES.CUSTOMER as t2) as t3";
-    sql(sql3).with(getTesterWithDynamicTable()).anyPlan();
 
-    final String sql4 = "select t3.fake_q1['fake_col2'] as fake2 "
-        + "from (select t2.fake_col as fake_q1 from SALES.CUSTOMER as t2) as t3";
-    sql(sql4).with(getTesterWithDynamicTable()).anyPlan();
+    sql(sql).with(getTesterWithDynamicTable()).ok();
   }
 
   @Test
@@ -2458,19 +2464,9 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
         + "from SALES.CUSTOMER as t1, "
         + "lateral (select t2.fake_col2 as fake_col3 from unnest(t1.fake_col) as t2) as t3";
 
-    sql(sql3).with(getTesterWithDynamicTable()).anyPlan();
-
+    sql(sql3).with(getTesterWithDynamicTable()).ok();
   }
 
-  @Test
-  public void testDynamicSchemaSubquery() throws Exception {
-
-    final String sql3 = "select t1.fake_col, t1.fake_col2 as fake_col2 "
-        + "from (select * from SALES.CUSTOMER ) as t1";
-
-    sql(sql3).with(getTesterWithDynamicTable()).anyPlan();
-
-  }
   /**
    * Test case for Dynamic Table / Dynamic Star support
    * <a href="https://issues.apache.org/jira/browse/CALCITE-1150">[CALCITE-1150]</a>
@@ -2854,9 +2850,7 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
     public void ok() {
       convertsTo("${plan}");
     }
-    public void anyPlan() {
-      convertsTo("ANYPLAN");
-    }
+
     public void convertsTo(String plan) {
       tester.withExpand(expand)
           .withDecorrelation(decorrelate)

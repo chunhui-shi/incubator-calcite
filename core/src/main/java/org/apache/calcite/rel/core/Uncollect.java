@@ -34,7 +34,8 @@ import org.apache.calcite.sql.SqlUtil;
 import org.apache.calcite.sql.type.MapSqlType;
 import org.apache.calcite.sql.type.SqlTypeName;
 
-import java.util.ArrayList;
+import com.google.common.collect.Lists;
+
 import java.util.List;
 
 /**
@@ -129,24 +130,27 @@ public class Uncollect extends SingleRel {
     final List<RelDataTypeField> fields = inputType.getFieldList();
     final RelDataTypeFactory typeFactory = rel.getCluster().getTypeFactory();
     final RelDataTypeFactory.Builder builder = typeFactory.builder();
+
+    if (fields.size() == 1 && fields.get(0).getType().getComponentType() == null) {
+      // Component type is unknown to Uncollect, build dynamic star record type.
+      // Only consider ONE field case for unknown type.
+      List<RelDataTypeField> toAddFields = Lists.newArrayList();
+      RelDataTypeField dynField = new RelDataTypeFieldImpl(
+          DynamicRecordType.DYNAMIC_STAR_PREFIX,
+          0,
+          typeFactory.createTypeWithNullability(
+              typeFactory.createSqlType(SqlTypeName.ANY), true));
+      toAddFields.add(dynField);
+      RelRecordType dynRet = new RelRecordType(toAddFields);
+      return dynRet;
+    }
+
     for (RelDataTypeField field : fields) {
       if (field.getType() instanceof MapSqlType) {
         builder.add(SqlUnnestOperator.MAP_KEY_COLUMN_NAME, field.getType().getKeyType());
         builder.add(SqlUnnestOperator.MAP_VALUE_COLUMN_NAME, field.getType().getValueType());
       } else {
         RelDataType ret = field.getType().getComponentType();
-        if (ret == null) {
-          //DynamicRecordType dynRet = new DynamicRecordTypeImpl(typeFactory);
-          RelDataTypeField dynField = new RelDataTypeFieldImpl(
-              DynamicRecordType.DYNAMIC_STAR_PREFIX,
-              0,
-              typeFactory.createTypeWithNullability(
-                  typeFactory.createSqlType(SqlTypeName.DYNAMIC_STAR), true));
-          List<RelDataTypeField> toAddFields = new ArrayList<>();
-          toAddFields.add(dynField);
-          RelRecordType dynRet = new RelRecordType(toAddFields);
-          return dynRet;
-        }
         assert null != ret;
         if (ret.isStruct()) {
           builder.addAll(ret.getFieldList());
