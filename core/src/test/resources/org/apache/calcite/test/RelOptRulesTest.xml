@@ -8243,4 +8243,35 @@ LogicalProject(EMPNO=[$0], ENAME=[$1], JOB=[$2], MGR=[$3], HIREDATE=[$4], SAL=[$
 ]]>
         </Resource>
     </TestCase>
+    <TestCase name="testProjectCorrelateTransposeWithExprCond">
+        <Resource name="sql">
+            <![CDATA[select * from emp
+where sal = 4
+or empno NOT IN (select deptno from dept)]]>
+        </Resource>
+        <Resource name="planBefore">
+            <![CDATA[
+LogicalProject(NAME=[$1], ENAME=[$4])
+  LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{2}])
+    LogicalTableScan(table=[[CATALOG, SALES, DEPT_NESTED]])
+    Uncollect
+      LogicalProject(EMPLOYEES=[$cor0.EMPLOYEES])
+        LogicalValues(tuples=[[{ 0 }]])
+]]>
+        </Resource>
+
+        <Resource name="planAfter">
+            <![CDATA[
+LogicalProject(NAME=[$0], ENAME=[$2])
+  LogicalCorrelate(correlation=[$cor0], joinType=[inner], requiredColumns=[{1}])
+    LogicalProject(NAME=[$1], EMPLOYEES=[$2])
+      LogicalTableScan(table=[[CATALOG, SALES, DEPT_NESTED]])
+    LogicalProject(ENAME=[$1])
+      Uncollect
+        LogicalProject(EMPLOYEES=[$cor0.EMPLOYEES])
+          LogicalValues(tuples=[[{ 0 }]])
+]]>
+        </Resource>
+    </TestCase>
+
 </Root>

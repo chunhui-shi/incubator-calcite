@@ -2604,47 +2604,6 @@ public class SqlToRelConverterTest extends SqlToRelTestBase {
       });
   }
 
-  private Tester getTesterWithDynamicTable() {
-    return tester.withCatalogReaderFactory(
-        new Function<RelDataTypeFactory, Prepare.CatalogReader>() {
-          public Prepare.CatalogReader apply(RelDataTypeFactory typeFactory) {
-            return new MockCatalogReader(typeFactory, true) {
-              @Override public MockCatalogReader init() {
-                // CREATE SCHEMA "SALES;
-                // CREATE DYNAMIC TABLE "NATION"
-                // CREATE DYNAMIC TABLE "CUSTOMER"
-
-                MockSchema schema = new MockSchema("SALES");
-                registerSchema(schema);
-
-                MockTable nationTable = new MockDynamicTable(this, schema.getCatalogName(),
-                    schema.getName(), "NATION", false, 100);
-                registerTable(nationTable);
-
-                MockTable customerTable = new MockDynamicTable(this, schema.getCatalogName(),
-                    schema.getName(), "CUSTOMER", false, 100);
-                registerTable(customerTable);
-
-                // CREATE TABLE "REGION" - static table with known schema.
-                final RelDataType intType =
-                    typeFactory.createSqlType(SqlTypeName.INTEGER);
-                final RelDataType varcharType =
-                    typeFactory.createSqlType(SqlTypeName.VARCHAR);
-
-                MockTable regionTable = MockTable.create(this, schema, "REGION", false, 100);
-                regionTable.addColumn("R_REGIONKEY", intType);
-                regionTable.addColumn("R_NAME", varcharType);
-                regionTable.addColumn("R_COMMENT", varcharType);
-                registerTable(regionTable);
-
-                return this;
-              }
-              // CHECKSTYLE: IGNORE 1
-            }.init();
-          }
-        });
-  }
-
   @Test public void testLarge() {
     SqlValidatorTest.checkLarge(400,
         new Function<String, Void>() {

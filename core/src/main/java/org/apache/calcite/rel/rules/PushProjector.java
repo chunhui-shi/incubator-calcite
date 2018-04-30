@@ -20,6 +20,7 @@ import org.apache.calcite.linq4j.Ord;
 import org.apache.calcite.plan.RelOptUtil;
 import org.apache.calcite.plan.Strong;
 import org.apache.calcite.rel.RelNode;
+import org.apache.calcite.rel.core.Correlate;
 import org.apache.calcite.rel.core.Join;
 import org.apache.calcite.rel.core.Project;
 import org.apache.calcite.rel.core.SemiJoin;
@@ -250,6 +251,33 @@ public class PushProjector {
         strongBitmap = ImmutableBitSet.range(nSysFields, nChildFields);
       }
 
+    } else if (childRel instanceof Correlate) {
+      Correlate joinRel = (Correlate) childRel;
+      List<RelDataTypeField> leftFields =
+          joinRel.getLeft().getRowType().getFieldList();
+      List<RelDataTypeField> rightFields =
+          joinRel.getRight().getRowType().getFieldList();
+      nFields = leftFields.size();
+      nFieldsRight = rightFields.size();
+      nSysFields = 0;
+      childBitmap =
+          ImmutableBitSet.range(nSysFields, nFields + nSysFields);
+      rightBitmap =
+          ImmutableBitSet.range(nFields + nSysFields, nChildFields);
+
+      // Required columns need to be included in project
+      projRefs.or(BitSets.of(joinRel.getRequiredColumns()));
+
+      switch (joinRel.getJoinType()) {
+      case INNER:
+        strongBitmap = ImmutableBitSet.of();
+        break;
+      case LEFT: // All the right-input's columns must be strong
+        strongBitmap = ImmutableBitSet.range(nFields + nSysFields, nChildFields);
+        break;
+      default:
+        strongBitmap = ImmutableBitSet.range(nSysFields, nChildFields);
+      }
     } else {
       nFields = nChildFields;
       nFieldsRight = 0;
